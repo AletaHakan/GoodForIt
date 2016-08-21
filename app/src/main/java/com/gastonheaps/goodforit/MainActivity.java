@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 .build();
 
         //TODO Progress bar
-        //mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
+        //mProgressBar = (ProgressBar) findViewById(R.contactId.progressBar);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
