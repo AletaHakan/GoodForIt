@@ -12,7 +12,7 @@ import android.view.ViewGroup;
 
 import com.firebase.ui.database.FirebaseRecyclerAdapter;
 import com.gastonheaps.goodforit.model.Loan;
-import com.gastonheaps.goodforit.viewholder.LoanViewHolder;
+import com.gastonheaps.goodforit.ui.LoanViewHolder;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 

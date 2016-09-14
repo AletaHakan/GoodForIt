@@ -1,4 +1,4 @@
-package com.gastonheaps.goodforit.viewholder;
+package com.gastonheaps.goodforit.ui;
 
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
