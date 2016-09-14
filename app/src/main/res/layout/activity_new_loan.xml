@@ -17,7 +17,7 @@
             android:layout_marginBottom="5dp"
             android:orientation="horizontal">
 
-            <com.gastonheaps.goodforit.ContactsEditText
+            <com.gastonheaps.goodforit.ui.ContactsEditText
                 android:id="@+id/new_loan_contact"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"

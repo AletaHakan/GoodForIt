@@ -1,10 +1,10 @@
 package com.gastonheaps.goodforit;
 
 import android.app.Fragment;
-import android.app.ProgressDialog;
 import android.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 
+import com.gastonheaps.goodforit.ui.ProgressDialogFragment;
 import com.google.firebase.auth.FirebaseAuth;
 
 /**

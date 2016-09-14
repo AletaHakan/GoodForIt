@@ -1,23 +1,25 @@
 package com.gastonheaps.goodforit;
 
-import android.content.Context;
+import android.app.DialogFragment;
 import android.content.Intent;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.gastonheaps.goodforit.model.Loan;
+import com.firebase.ui.database.FirebaseRecyclerAdapter;
 import com.gastonheaps.goodforit.model.Payment;
-import com.gastonheaps.goodforit.util.GlideUtil;
+import com.gastonheaps.goodforit.ui.AddPaymentDialogFragment;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.ChildEventListener;
@@ -25,33 +27,35 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ServerValue;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
-public class LoanDetailActivity extends AppCompatActivity {
+public class LoanDetailActivity extends AppCompatActivity implements FirebaseAuth.AuthStateListener,
+        AddPaymentDialogFragment.NoticeDialogListener{
 
     private static final String TAG = "LoanDetailActivity";
     public static final String EXTRA_LOAN_KEY = "loan_key";
 
     private String mLoanKey;
 
-    private FirebaseAuth mFirebaseAuth;
-    private FirebaseUser mFirebaseUser;
+    private FirebaseAuth mAuth;
+    private FirebaseUser mUser;
+    private DatabaseReference mRef;
 
-    private DatabaseReference mLoanReference;
-    private DatabaseReference mPaymentsReference;
-    private DatabaseReference mLoanPaymentsReference;
-    private ValueEventListener mLoanListener;
-    private PaymentAdapter mAdapter;
+    private DatabaseReference mLoanRef;
+    private DatabaseReference mPaymentsRef;
+    private DatabaseReference mLoanPaymentsRef;
 
     private String mImageUrl;
     private CircleImageView mProfileImage;
-    private TextView mAmount;
     private RecyclerView mList;
+    private LinearLayoutManager mManager;
+    private FirebaseRecyclerAdapter<Payment, PaymentHolder> mRecyclerViewAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,28 +65,28 @@ public class LoanDetailActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         mProfileImage = (CircleImageView) findViewById(R.id.loan_detail_profile_image);
-        mAmount = (TextView) findViewById(R.id.loan_detail_amount);
-        mList = (RecyclerView) findViewById(R.id.loan_detail_list);
+        mList = (RecyclerView) findViewById(R.id.loan_payment_list);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.loan_detail_fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
+
+                showAddPaymentDialog();
             }
         });
 
-        mFirebaseAuth = FirebaseAuth.getInstance();
-        mFirebaseUser = mFirebaseAuth.getCurrentUser();
+        mAuth = FirebaseAuth.getInstance();
+        mAuth.addAuthStateListener(this);
+        mUser = mAuth.getCurrentUser();
 
-        if (mFirebaseUser == null) {
+        if (mUser == null) {
             // Not signed in, launch the Sign In activity
             startActivity(new Intent(this, SignInActivity.class));
             finish();
             return;
         } else {
-            mImageUrl = mFirebaseUser.getPhotoUrl().toString();
+            mImageUrl = mUser.getPhotoUrl().toString();
         }
 
         // Get loan key from intent
@@ -91,195 +95,211 @@ public class LoanDetailActivity extends AppCompatActivity {
             throw new IllegalArgumentException("Must pass EXTRA_LOAN_KEY");
         }
 
-        mLoanReference = FirebaseDatabase.getInstance().getReference()
-                .child("loans").child(mLoanKey);
-        mPaymentsReference = FirebaseDatabase.getInstance().getReference()
-                .child("payments");
-        mLoanPaymentsReference = FirebaseDatabase.getInstance().getReference()
-                .child("loan-payments").child(mLoanKey);
+        mRef = FirebaseDatabase.getInstance().getReference();
 
-        mAdapter = new PaymentAdapter(this, mPaymentsReference);
-        mList.setAdapter(mAdapter);
+        mLoanRef = mRef.child("loans").child(mLoanKey);
+        mPaymentsRef = mRef.child("payments");
+        mLoanPaymentsRef = mRef.child("loan-payments").child(mLoanKey);
+        mLoanPaymentsRef.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                Payment newPayment = dataSnapshot.getValue(Payment.class);
+            }
+
+            @Override
+            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onChildRemoved(DataSnapshot dataSnapshot) {
+
+            }
+
+            @Override
+            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        mList = (RecyclerView) findViewById(R.id.loan_payment_list);
+
+        mManager = new LinearLayoutManager(this);
+        mManager.setReverseLayout(false);
+
+        mList.setHasFixedSize(false);
+        mList.setLayoutManager(mManager);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
 
-        ValueEventListener loanListener = new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-                Loan loan = dataSnapshot.getValue(Loan.class);
-
-                GlideUtil.loadProfileIcon(mImageUrl, mProfileImage);
-                mAmount.setText(String.valueOf(loan.getAmount()));
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                // Getting Post failed, log a message
-                Log.w(TAG, "loadLoan:onCancelled", databaseError.toException());
-                // [START_EXCLUDE]
-                Toast.makeText(LoanDetailActivity.this, "Failed to load post.",
-                        Toast.LENGTH_SHORT).show();
-                // [END_EXCLUDE]
-            }
-        };
-        mLoanReference.addValueEventListener(loanListener);
-
-        mLoanListener = loanListener;
+        // Default Database rules do not allow unauthenticated reads, so we need to
+        // sign in before attaching the RecyclerView adapter otherwise the Adapter will
+        // not be able to read any data from the Database.
+        if (!isSignedIn()) {
+            signIn();
+        } else {
+            attachRecyclerViewAdapter();
+        }
     }
 
     @Override
     protected void onStop() {
         super.onStop();
 
-        // Remove post value event listener
-        if (mLoanListener != null) {
-            mLoanReference.removeEventListener(mLoanListener);
+        if (mRecyclerViewAdapter != null) {
+            mRecyclerViewAdapter.cleanup();
         }
     }
 
-    private static class PaymentViewHolder extends RecyclerView.ViewHolder {
-
-        public TextView amountView;
-        public TextView dateView;
-
-        public PaymentViewHolder(View itemView) {
-            super(itemView);
-
-            amountView = (TextView) itemView.findViewById(R.id.payment_amount);
-            dateView = (TextView) itemView.findViewById(R.id.payment_date);
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if (mAuth != null) {
+            mAuth.removeAuthStateListener(this);
         }
     }
 
-    private static class PaymentAdapter extends RecyclerView.Adapter<PaymentViewHolder> {
+    @Override
+    public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
+        //updateUI();
+    }
 
-        private Context mContext;
-        private DatabaseReference mDatabaseReference;
-        private ChildEventListener mChildEventListener;
+    private void attachRecyclerViewAdapter() {
+        Query lastFifty = mLoanPaymentsRef.limitToLast(50);
+        mRecyclerViewAdapter = new FirebaseRecyclerAdapter<Payment, PaymentHolder>(
+                Payment.class, R.layout.list_item_payment, PaymentHolder.class, lastFifty) {
 
-        private List<String> mPaymentIds = new ArrayList<>();
-        private List<Payment> mPayments = new ArrayList<>();
 
-        public PaymentAdapter(final Context context, DatabaseReference ref) {
-            mContext = context;
-            mDatabaseReference = ref;
+            @Override
+            public void populateViewHolder(PaymentHolder paymentView, Payment payment, int position) {
+                paymentView.setAmount(payment.getAmount().toString());
+                paymentView.setDate(payment.getPaymentDate());
 
-            // Create child event listener
-            // [START child_event_listener_recycler]
-            ChildEventListener childEventListener = new ChildEventListener() {
-                @Override
-                public void onChildAdded(DataSnapshot dataSnapshot, String previousChildName) {
-                    Log.d(TAG, "onChildAdded:" + dataSnapshot.getKey());
-
-                    // A new comment has been added, add it to the displayed list
-                    Payment payment = dataSnapshot.getValue(Payment.class);
-
-                    // [START_EXCLUDE]
-                    // Update RecyclerView
-                    mPaymentIds.add(dataSnapshot.getKey());
-                    mPayments.add(payment);
-                    notifyItemInserted(mPayments.size() - 1);
-                    // [END_EXCLUDE]
-                }
-
-                @Override
-                public void onChildChanged(DataSnapshot dataSnapshot, String previousChildName) {
-                    Log.d(TAG, "onChildChanged:" + dataSnapshot.getKey());
-
-                    // A comment has changed, use the key to determine if we are displaying this
-                    // comment and if so displayed the changed comment.
-                    Payment newPayment = dataSnapshot.getValue(Payment.class);
-                    String paymentKey = dataSnapshot.getKey();
-
-                    // [START_EXCLUDE]
-                    int paymentIndex = mPaymentIds.indexOf(paymentKey);
-                    if (paymentIndex > -1) {
-                        // Replace with the new data
-                        mPayments.set(paymentIndex, newPayment);
-
-                        // Update the RecyclerView
-                        notifyItemChanged(paymentIndex);
-                    } else {
-                        Log.w(TAG, "onChildChanged:unknown_child:" + paymentKey);
-                    }
-                    // [END_EXCLUDE]
-                }
-
-                @Override
-                public void onChildRemoved(DataSnapshot dataSnapshot) {
-                    Log.d(TAG, "onChildRemoved:" + dataSnapshot.getKey());
-
-                    // A comment has changed, use the key to determine if we are displaying this
-                    // comment and if so remove it.
-                    String paymentKey = dataSnapshot.getKey();
-
-                    // [START_EXCLUDE]
-                    int paymentIndex = mPaymentIds.indexOf(paymentKey);
-                    if (paymentIndex > -1) {
-                        // Remove data from the list
-                        mPaymentIds.remove(paymentIndex);
-                        mPayments.remove(paymentIndex);
-
-                        // Update the RecyclerView
-                        notifyItemRemoved(paymentIndex);
-                    } else {
-                        Log.w(TAG, "onChildRemoved:unknown_child:" + paymentKey);
-                    }
-                    // [END_EXCLUDE]
-                }
-
-                @Override
-                public void onChildMoved(DataSnapshot dataSnapshot, String previousChildName) {
-                    Log.d(TAG, "onChildMoved:" + dataSnapshot.getKey());
-
-                    // A comment has changed position, use the key to determine if we are
-                    // displaying this comment and if so move it.
-                    Payment movedPayment = dataSnapshot.getValue(Payment.class);
-                    String paymentKey = dataSnapshot.getKey();
-
-                    // ...
-                }
-
-                @Override
-                public void onCancelled(DatabaseError databaseError) {
-                    Log.w(TAG, "postComments:onCancelled", databaseError.toException());
-                    Toast.makeText(mContext, "Failed to load comments.",
-                            Toast.LENGTH_SHORT).show();
-                }
-            };
-            ref.addChildEventListener(childEventListener);
-            // [END child_event_listener_recycler]
-
-            // Store reference to listener so it can be removed on app stop
-            mChildEventListener = childEventListener;
-        }
-
-        @Override
-        public PaymentViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            LayoutInflater inflater = LayoutInflater.from(mContext);
-            View view = inflater.inflate(R.layout.item_payment, parent, false);
-            return new PaymentViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(PaymentViewHolder holder, int position) {
-            Payment payment = mPayments.get(position);
-            holder.amountView.setText(String.valueOf(payment.amount));
-            holder.dateView.setText(payment.paymentDate);
-        }
-
-        @Override
-        public int getItemCount() {
-            return mPayments.size();
-        }
-
-        public void cleanupListener() {
-            if (mChildEventListener != null) {
-                mDatabaseReference.removeEventListener(mChildEventListener);
+                FirebaseUser currentUser = mAuth.getCurrentUser();
+/*                if (currentUser != null && message.getUid().equals(currentUser.getUid())) {
+                    messageView.setIsSender(true);
+                } else {
+                    messageView.setIsSender(false);
+                }*/
             }
+        };
+
+        // Scroll to bottom on new messages
+        mRecyclerViewAdapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onItemRangeInserted(int positionStart, int itemCount) {
+                mManager.smoothScrollToPosition(mList, null, mRecyclerViewAdapter.getItemCount());
+            }
+        });
+
+        mList.setAdapter(mRecyclerViewAdapter);
+    }
+
+    private void signIn() {
+        Toast.makeText(this, "Signing in...", Toast.LENGTH_SHORT).show();
+        mAuth.signInAnonymously()
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        Log.d(TAG, "signInAnonymously:onComplete:" + task.isSuccessful());
+                        if (task.isSuccessful()) {
+                            Toast.makeText(LoanDetailActivity.this, "Signed In",
+                                    Toast.LENGTH_SHORT).show();
+                            attachRecyclerViewAdapter();
+                        } else {
+                            Toast.makeText(LoanDetailActivity.this, "Sign In Failed",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+    }
+
+    public boolean isSignedIn() {
+        return (mAuth.getCurrentUser() != null);
+    }
+
+    private void createNewPayment(Integer amount, String paymentDate, String notes, Object timestamp, String uid) {
+        String key = mPaymentsRef.push().getKey();
+
+        Payment payment = new Payment(amount, paymentDate, notes, timestamp, uid);
+        Map<String, Object> paymentValues = payment.toMap();
+
+        Map<String, Object> childUpdates = new HashMap<>();
+
+        childUpdates.put("/payments/" + key, paymentValues);
+        childUpdates.put("/loan-payments/" + mLoanKey + "/" + key, paymentValues);
+
+        mRef.updateChildren(childUpdates);
+    }
+
+    public static class PaymentHolder extends RecyclerView.ViewHolder {
+        View mView;
+
+        public PaymentHolder(View itemView) {
+            super(itemView);
+            mView = itemView;
         }
 
+/*         public void setIsSender(Boolean isSender) {
+            FrameLayout left_arrow = (FrameLayout) mView.findViewById(R.id.left_arrow);
+            FrameLayout right_arrow = (FrameLayout) mView.findViewById(R.id.right_arrow);
+            RelativeLayout messageContainer = (RelativeLayout) mView.findViewById(R.id.message_container);
+            LinearLayout message = (LinearLayout) mView.findViewById(R.id.message);
+
+            int color;
+            if (isSender) {
+                color = ContextCompat.getColor(mView.getContext(), R.color.material_green_300);
+
+                left_arrow.setVisibility(View.GONE);
+                right_arrow.setVisibility(View.VISIBLE);
+                messageContainer.setGravity(Gravity.END);
+            } else {
+                color = ContextCompat.getColor(mView.getContext(), R.color.material_gray_300);
+
+                left_arrow.setVisibility(View.VISIBLE);
+                right_arrow.setVisibility(View.GONE);
+                messageContainer.setGravity(Gravity.START);
+            }
+
+            ((GradientDrawable) message.getBackground()).setColor(color);
+            ((RotateDrawable) left_arrow.getBackground()).getDrawable()
+                    .setColorFilter(color, PorterDuff.Mode.SRC);
+            ((RotateDrawable) right_arrow.getBackground()).getDrawable()
+                    .setColorFilter(color, PorterDuff.Mode.SRC);
+        }*/
+
+        public void setAmount(String name) {
+            TextView field = (TextView) mView.findViewById(R.id.payment_amount);
+            field.setText(name);
+        }
+
+        public void setDate(String date) {
+            TextView field = (TextView) mView.findViewById(R.id.payment_date);
+            field.setText(date);
+        }
+    }
+
+    public void showAddPaymentDialog() {
+        // Create an instance of the dialog fragment and show it
+        DialogFragment dialog = new AddPaymentDialogFragment();
+        dialog.show(getFragmentManager(), "AddPaymentDialogFragment");
+    }
+
+    @Override
+    public void onDialogPositiveClick(DialogFragment dialog, String amount, String notes) {
+        createNewPayment(Integer.valueOf(amount), "2016-01-01", notes, ServerValue.TIMESTAMP, mUser.getUid());
+    }
+
+    @Override
+    public void onDialogNegativeClick(DialogFragment dialog) {
+        dialog.getDialog().cancel();
     }
 }

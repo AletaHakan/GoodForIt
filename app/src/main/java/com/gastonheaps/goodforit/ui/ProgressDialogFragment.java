@@ -1,4 +1,4 @@
-package com.gastonheaps.goodforit;
+package com.gastonheaps.goodforit.ui;
 
 import android.app.Dialog;
 import android.app.DialogFragment;

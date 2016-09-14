@@ -2,30 +2,27 @@ package com.gastonheaps.goodforit.model;
 
 import com.google.firebase.database.Exclude;
 import com.google.firebase.database.IgnoreExtraProperties;
+import com.google.firebase.database.ServerValue;
 
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Created by Gaston on 6/5/2016.
- */
-@IgnoreExtraProperties
 public class Payment {
     public Integer amount;
     public String paymentDate;
     public String notes;
-    public HashMap<String, Object> timestampCreated;
+    public Object timestamp;
     public String uid;
 
     public Payment() {
         // Default constructor required for calls to DataSnapshot.getValue(Post.class)
     }
 
-    public Payment(Integer amount, String paymentDate, String notes, HashMap<String, Object> timestampCreated, String uid) {
+    public Payment(Integer amount, String paymentDate, String notes, Object timestamp, String uid) {
         this.amount = amount;
         this.paymentDate = paymentDate;
         this.notes = notes;
-        this.timestampCreated = timestampCreated;
+        this.timestamp = timestamp;
         this.uid = uid;
     }
 
@@ -45,12 +42,19 @@ public class Payment {
         return uid;
     }
 
-    public HashMap<String, Object> getTimestampCreated() {
-        return timestampCreated;
+    public Object getTimestamp() {
+        return timestamp;
     }
 
     @Exclude
-    public long getTimestampCreatedLong(){
-        return (long)timestampCreated.get("timestamp");
+    public Map<String, Object> toMap() {
+        HashMap<String, Object> result = new HashMap<>();
+        result.put("amount", amount);
+        result.put("paymentDate", paymentDate);
+        result.put("notes", notes);
+        result.put("timestamp", timestamp);
+        result.put("uid", uid);
+
+        return result;
     }
 }

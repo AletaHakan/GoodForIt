@@ -19,6 +19,7 @@ import android.widget.Toast;
 
 import com.gastonheaps.goodforit.model.Loan;
 import com.gastonheaps.goodforit.model.User;
+import com.gastonheaps.goodforit.ui.ContactsEditText;
 import com.gastonheaps.goodforit.util.FirebaseUtil;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;

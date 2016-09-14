@@ -1,4 +1,4 @@
-package com.gastonheaps.goodforit;
+package com.gastonheaps.goodforit.ui;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -17,11 +17,17 @@ import android.widget.CursorAdapter;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.gastonheaps.goodforit.R;
 import com.gastonheaps.goodforit.util.GlideUtil;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.ProviderQueryResult;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
@@ -30,7 +36,7 @@ import de.hdodenhof.circleimageview.CircleImageView;
  */
 public class ContactsEditText extends AutoCompleteTextView {
 
-    private FirebaseAuth mFirebaseAuth;
+    private DatabaseReference mDatabase;
 
     private ContactsAdapter mAdapter;
 
@@ -50,7 +56,7 @@ public class ContactsEditText extends AutoCompleteTextView {
     }
 
     private void init(Context context) {
-        mFirebaseAuth = FirebaseAuth.getInstance();
+        mDatabase = FirebaseDatabase.getInstance().getReference();
 
         // Set adapter
         mAdapter = new ContactsAdapter(context);
@@ -89,7 +95,7 @@ public class ContactsEditText extends AutoCompleteTextView {
         @Override
         public Object getItem(int position) {
             Cursor cursor = (Cursor) super.getItem(position);
-            final Contact contact = new Contact();
+            Contact contact = new Contact();
 
             String imageUri = cursor.getString(ContactsQuery.PHOTO_THUMBNAIL_DATA_COLUMN);
 
@@ -98,22 +104,6 @@ public class ContactsEditText extends AutoCompleteTextView {
             contact.displayName = cursor.getString(ContactsQuery.DISPLAY_NAME_PRIMARY_COLUMN);
             contact.contactInformation = cursor.getString(ContactsQuery.CONTACT_INFORMATION_COLUMN);
             contact.contactType = cursor.getString(ContactsQuery.CONTACT_TYPE_COLUMN);
-
-                mFirebaseAuth.fetchProvidersForEmail(contact.contactInformation).addOnCompleteListener(new OnCompleteListener<ProviderQueryResult>() {
-                    @Override
-                    public void onComplete(@NonNull Task<ProviderQueryResult> task) {
-                        if (task.isSuccessful()) {
-                            ///////// getProviders() will return size 1. if email ID is available.
-                            if (task.getResult().getProviders().size() > 0) {
-                                contact.registered = true;
-                            } else {
-                                contact.registered = false;
-                            }
-                        } else {
-                            contact.registered = false;
-                        }
-                    }
-                });
 
             Uri thumbUri;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB && imageUri != null) {
@@ -124,6 +114,7 @@ public class ContactsEditText extends AutoCompleteTextView {
             }
             //GlideUtil.loadImage(thumbUri, contact.image);
 
+            Log.d("CONTACT", String.valueOf(contact.registered));
             return contact;
         }
 
@@ -170,17 +161,26 @@ public class ContactsEditText extends AutoCompleteTextView {
             final String displayName = cursor.getString(ContactsQuery.DISPLAY_NAME_PRIMARY_COLUMN);
             final String contactInformation = cursor.getString(ContactsQuery.CONTACT_INFORMATION_COLUMN);
             final String contactType = cursor.getString(ContactsQuery.CONTACT_TYPE_COLUMN);
-            Contact contact = (Contact) getItem(cursor.getPosition());
-            Log.d("CONTACT:", contact.contactInformation + ", " + contact.registered);
 
             holder.nameText.setText(displayName);
             holder.contactInformationText.setText(contactInformation);
 
-            if (contact.registered) {
-                holder.registeredImage.setVisibility(View.VISIBLE);
-            } else {
-                holder.registeredImage.setVisibility(View.INVISIBLE);
-            }
+            mDatabase.child("users").orderByChild("email").equalTo(contactInformation)
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(DataSnapshot dataSnapshot) {
+                            if (dataSnapshot.getValue() != null) {
+                                holder.registeredImage.setVisibility(View.VISIBLE);
+                            } else {
+                                holder.registeredImage.setVisibility(View.INVISIBLE);
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(DatabaseError databaseError) {
+
+                        }
+                    });
 
             Uri thumbUri;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB && imageUri != null) {

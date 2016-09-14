@@ -12,9 +12,6 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Created by Gaston on 6/5/2016.
- */
 public class Loan {
     public String person;
     public Integer type;
