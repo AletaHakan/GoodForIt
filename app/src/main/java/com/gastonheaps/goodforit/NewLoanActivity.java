@@ -9,6 +9,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.EditText;
@@ -21,6 +22,7 @@ import com.gastonheaps.goodforit.model.Loan;
 import com.gastonheaps.goodforit.model.User;
 import com.gastonheaps.goodforit.ui.ContactsEditText;
 import com.gastonheaps.goodforit.util.FirebaseUtil;
+import com.gastonheaps.goodforit.util.GlideUtil;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -50,6 +52,7 @@ public class NewLoanActivity extends BaseActivity {
     private Integer mType = 1;
     private static Calendar mDate;
     private static String mLoanKey;
+    private static ContactsEditText.Contact mContact;
 
     private LinearLayout mContactLayout;
     private ContactsEditText mContactText;
@@ -70,6 +73,12 @@ public class NewLoanActivity extends BaseActivity {
 
         mContactLayout = (LinearLayout) findViewById(R.id.new_loan_contact_layout);
         mContactText = (ContactsEditText) findViewById(R.id.new_loan_contact);
+        mContactText.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                mContact = (ContactsEditText.Contact) mContactText.getAdapter().getItem(i);
+            }
+        });
         mUserProfileText = (TextView) findViewById(R.id.new_loan_user_profile);
         mAmountText = (EditText) findViewById(R.id.new_loan_amount);
         mNotesText = (EditText) findViewById(R.id.new_loan_notes);
@@ -112,17 +121,11 @@ public class NewLoanActivity extends BaseActivity {
     }
 
     private void submitLoan() {
-        final String person = mContactText.getText().toString();
+        final String person = mContact.lookupUri.toString();
         final Integer type = mType;
         final Integer amount = Integer.valueOf(mAmountText.getText().toString());
         final Long date = mDate.getTimeInMillis();
         final String notes = mNotesText.getText().toString();
-
-        // Title is required
-        if (TextUtils.isEmpty(person)) {
-            mContactText.setError(REQUIRED);
-            return;
-        }
 
         // Body is required
         if (TextUtils.isEmpty(amount.toString())) {

@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.CursorAdapter;
 import android.widget.ImageView;
@@ -61,7 +62,12 @@ public class ContactsEditText extends AutoCompleteTextView {
         // Set adapter
         mAdapter = new ContactsAdapter(context);
         setAdapter(mAdapter);
+        setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
 
+            }
+        });
         // Pop up suggestions after 1 character is typed.
         setThreshold(1);
     }
@@ -71,10 +77,16 @@ public class ContactsEditText extends AutoCompleteTextView {
         return ((Contact) selectedItem).displayName;
     }
 
+    @Override
+    public void setOnItemSelectedListener(AdapterView.OnItemSelectedListener l) {
+        super.setOnItemSelectedListener(l);
+    }
+
     public class Contact {
         public long id;
-        public long contactId;
+        public Uri lookupUri;
         public String displayName;
+        public String imageUri;
         public CircleImageView image;
         public String contactInformation;
         public String contactType;
@@ -97,22 +109,21 @@ public class ContactsEditText extends AutoCompleteTextView {
             Cursor cursor = (Cursor) super.getItem(position);
             Contact contact = new Contact();
 
-            String imageUri = cursor.getString(ContactsQuery.PHOTO_THUMBNAIL_DATA_COLUMN);
-
             contact.id = cursor.getLong(ContactsQuery.ID_COLUMN);
-            contact.contactId = cursor.getLong(ContactsQuery.CONTACT_ID_COLUMN);
+            contact.lookupUri = ContactsContract.Contacts.getLookupUri(cursor.getLong(ContactsQuery.CONTACT_ID_COLUMN),cursor.getString(ContactsQuery.LOOKUP_KEY_COLUMN));
             contact.displayName = cursor.getString(ContactsQuery.DISPLAY_NAME_PRIMARY_COLUMN);
+            contact.imageUri = cursor.getString(ContactsQuery.PHOTO_THUMBNAIL_DATA_COLUMN);
             contact.contactInformation = cursor.getString(ContactsQuery.CONTACT_INFORMATION_COLUMN);
             contact.contactType = cursor.getString(ContactsQuery.CONTACT_TYPE_COLUMN);
 
-            Uri thumbUri;
+/*            Uri thumbUri;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB && imageUri != null) {
                 thumbUri = Uri.parse(imageUri);
             } else {
                 final Uri contactUri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI, imageUri);
-                thumbUri = Uri.withAppendedPath(contactUri, ContactsContract.Contacts.Photo.CONTENT_DIRECTORY);
-            }
-            //GlideUtil.loadImage(thumbUri, contact.image);
+            thumbUri = Uri.withAppendedPath(contactUri, ContactsContract.Contacts.Photo.CONTENT_DIRECTORY);
+        }
+        //GlideUtil.loadImage(thumbUri, contact.image);*/
 
             Log.d("CONTACT", String.valueOf(contact.registered));
             return contact;
@@ -242,6 +253,8 @@ public class ContactsEditText extends AutoCompleteTextView {
                 // The row's contactId
                 ContactsContract.Data.CONTACT_ID,
 
+                ContactsContract.Data.LOOKUP_KEY,
+
                 // In platform version 3.0 and later, the Contacts table contains
                 // DISPLAY_NAME_PRIMARY, which either contains the contact's displayable name or
                 // some other useful identifier such as an email address. This column isn't
@@ -262,10 +275,11 @@ public class ContactsEditText extends AutoCompleteTextView {
         // The query column numbers which map to each value in the projection
         final static int ID_COLUMN = 0;
         final static int CONTACT_ID_COLUMN = 1;
-        final static int DISPLAY_NAME_PRIMARY_COLUMN = 2;
-        final static int PHOTO_THUMBNAIL_DATA_COLUMN = 3;
-        final static int CONTACT_INFORMATION_COLUMN = 4;
-        final static int CONTACT_TYPE_COLUMN = 5;
+        final static int LOOKUP_KEY_COLUMN = 2;
+        final static int DISPLAY_NAME_PRIMARY_COLUMN = 3;
+        final static int PHOTO_THUMBNAIL_DATA_COLUMN = 4;
+        final static int CONTACT_INFORMATION_COLUMN = 5;
+        final static int CONTACT_TYPE_COLUMN = 6;
     }
 
     private static class Utils {
